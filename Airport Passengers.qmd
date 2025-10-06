@@ -1,0 +1,16 @@
+---
+title: "Airport Passengers"
+---
+
+## Setup
+
+Please run the following code in order to install the necessary packages with the required version. To do so, you'll have to install "renv", the following code will do so if not available.
+
+```{r}
+if (!require("renv", character.only = TRUE)) {
+  install.packages("renv", dependencies = TRUE)
+  library("renv", character.only = TRUE)
+}
+
+renv::restore
+```

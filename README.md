@@ -24,7 +24,7 @@ Passenger data is sourced from the Swiss Federal Statistical Office (FSO) and in
 
 ---
 
-## Methodology (High Level)
+## Methodology
 
 The model is trained on pre-COVID data to learn long-term trends and seasonal patterns in passenger traffic. It then generates a counterfactual forecast representing expected passenger volumes in the absence of COVID-19.
 

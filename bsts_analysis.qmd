@@ -3,12 +3,10 @@ title: "Causal impact: the impact of Covid-19 on the number of passengers in Swi
 author: "Luca Bella"
 date: "`r Sys.Date()`"
 format:
-  html:
+  pdf:
     toc: true
     toc-depth: 3
-    code-fold: true
-output-file: final_report.html
-output-dir: ../output
+output-file: final_report
 execute:
   echo: true
   warning: false

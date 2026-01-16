@@ -4,9 +4,12 @@
 .RData
 .Ruserdata
 .Rprofile
-.quarto
+
+# renv
+renv/library/
 
 # Quarto
+.quarto/
 *_cache/
 *_files/
 _quarto.yml
@@ -14,9 +17,8 @@ _quarto.yml
 # macOS
 .DS_Store
 
+# Output
+bsts_analysis_files/
+
 # Personal notes
 notes.txt
-
-# Folders
-bsts_analysis_files/
-/.quarto/

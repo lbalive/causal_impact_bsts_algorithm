@@ -1,4 +1,22 @@
+# R
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
+.Rprofile
+.quarto
+
+# Quarto
+*_cache/
+*_files/
+_quarto.yml
+
+# macOS
+.DS_Store
+
+# Personal notes
+notes.txt
+
+# Folders
+bsts_analysis_files/
+/.quarto/

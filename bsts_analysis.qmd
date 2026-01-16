@@ -1,0 +1,156 @@
+---
+title: "Causal impact: the impact of Covid-19 on the number of passengers in Swiss airports"
+author: "Luca Bella"
+date: "`r Sys.Date()`"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: true
+output-file: final_report.html
+output-dir: ../output
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Setup
+
+This project uses `renv` to ensure reproducible package versions. After cloning the repository, run:
+
+``` r
+install.packages("renv") # in case you don't have it
+renv::restore()
+```
+
+```{r}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(lubridate)
+  library(scales)
+  library(CausalImpact)
+})
+```
+
+# Data import, wrangling and first plots
+
+We <a href="https://stats.swiss/vis?lc=de&df[ds]=disseminate&df[id]=DF_AVIA_LC_PAX&df[ag]=CH1.AVIA&df[vs]=1.0.0&dq=LSZH%2BLSGG%2BLFSB%2B11.AB%2BAA.10._T._T.M&pd=2010-01%2C2025-06&to[TIME_PERIOD]=false&vw=tb" target="_blank" rel="noopener noreferrer">download data</a> from the Swiss Federal Office of Statistics
+
+```{r, message=FALSE, warning=FALSE}
+## import data
+data_airport_passengers <- read_csv("data/data_airport_passengers.csv")
+
+## wrangling
+# select relevant columns
+data_airport_passengers <- data_airport_passengers %>%
+  select("Airport", "Type of aviation", "TIME_PERIOD", "OBS_VALUE") %>%
+  rename(Date = TIME_PERIOD, Type = `Type of aviation`, Passengers = OBS_VALUE)
+head(data_airport_passengers)
+
+# check column types and adjust accordingly
+glimpse(data_airport_passengers)
+data_airport_passengers$Date <- paste0(data_airport_passengers$Date, "-01")
+data_airport_passengers$Date <- as.Date(data_airport_passengers$Date)
+
+# check for NAs
+sapply(data_airport_passengers, function(x) sum(is.na(x)))
+
+## plot
+ggplot(data_airport_passengers, aes(x = Date, y = Passengers, color = Airport)) +
+  geom_line() +
+  facet_grid(Type ~ ., scales = "free_y") +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  labs(
+    title = "Monthly Airport Passenger Counts Over 10 Years",
+    subtitle = "Data by Airport and Type",
+    x = "Year",
+    y = "Number of Passengers",
+    color = "Airport"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Comments: we can clearly see a strong seasonal component in all graphs. We'll have to take this into account when running our forecasting models. Moreover, there is a strong contraction of the number of passengers around the year 2020 clearly due to the Covid-19 pandemic.
+
+# Methodology
+
+This analysis estimates the causal impact of the COVID-19 pandemic on passenger traffic in Swiss airports using Google’s `CausalImpact` framework.
+
+The method is based on Bayesian Structural Time Series (BSTS) models, which learn the underlying trend and seasonal patterns from a pre-intervention period and generate a counterfactual prediction of what would have happened in the absence of the intervention.
+
+Monthly passenger data from January 2010 to February 2020 is used as the pre-intervention period, capturing long-term trends and strong seasonal patterns in air traffic. The post-intervention period starts in March 2020, corresponding to the onset of global travel restrictions related to COVID-19.
+
+The analysis focuses on national airports aggregated at the country level and is conducted separately for:
+
+- Scheduled flights
+- Charter flights
+
+This separation allows for a comparison of how different flight types were affected by the pandemic. Seasonality is explicitly modeled using monthly seasonal components to account for recurring fluctuations in passenger volumes.
+
+## Preparing our dataframe for the algorithm
+
+```{r}
+# Let's reframe our dataframe in a convenient way: spread data to wide format
+data_pivot_wider <- data_airport_passengers %>%
+  filter(Airport == "National airports", Type %in% c("Charter flights", "Scheduled flights")) %>%
+  pivot_wider(names_from = Type, values_from = Passengers, values_fill = 0) %>%
+  rename(Charter_flights = `Charter flights`, Scheduled_flights = `Scheduled flights`)
+
+# Pre and post periods
+min_date <- as.Date(min(data_airport_passengers$Date))
+max_date <- as.Date(max(data_airport_passengers$Date))
+
+covid_start <- as.Date("2020-03-01")
+
+pre_period <- c(min_date, covid_start %m-% months(1))
+post_period <- c(covid_start, max_date)
+```
+
+# Results
+
+Let's apply the algorithm to both chartered and scheduled flights
+
+```{r}
+# Charter flights
+charter_data_ts <- zoo(data_pivot_wider$Charter_flights, data_pivot_wider$Date) 
+
+impact_charter <- CausalImpact(charter_data_ts, pre_period, post_period, 
+                       model.args = list(nseasons = 12, season.duration = 1))
+
+
+summary(impact_charter)
+plot(impact_charter)
+
+
+# Scheduled flights
+scheduled_data_ts <- zoo(data_pivot_wider$Scheduled_flights, data_pivot_wider$Date) 
+
+impact_scheduled <- CausalImpact(scheduled_data_ts, pre_period, post_period, 
+                       model.args = list(nseasons = 12, season.duration = 1))
+
+summary(impact_scheduled)
+plot(impact_scheduled)
+```
+
+# Conclusion
+
+The results indicate a substantial and statistically significant decline in passenger traffic following the onset of the COVID-19 pandemic.
+
+For both scheduled and charter flights, the observed passenger numbers fall well below the counterfactual predictions generated by the model. The pointwise impact shows an immediate and severe drop starting in March 2020, while the cumulative impact highlights a large and persistent loss of passengers over time.
+
+Scheduled flights experienced the largest absolute impact, reflecting their higher baseline volumes and stronger exposure to international travel restrictions. Charter flights also show a significant decline, though with greater volatility and a more gradual recovery pattern.
+
+Despite partial recovery in later years, the cumulative impact remains strongly negative through the end of the observation period, suggesting that passenger volumes did not fully return to their pre-pandemic trajectory.
+
+Overall, this analysis provides evidence that COVID-19 caused a long-lasting structural disruption to air travel demand in Switzerland, with heterogeneous effects across flight types. The findings illustrate how causal inference methods can be used to quantify the magnitude and persistence of external shocks in real-world economic time series.
+
+## References
+
+- Brodersen, K. H., Gallusser, F., Koehler, J., Remy, N., & Scott, S. L. (2015).  
+  *Inferring causal impact using Bayesian structural time-series models.*  
+  Annals of Applied Statistics.
+
+- Swiss Federal Statistical Office (FSO).  
+  Air transport passenger statistics.  
+
